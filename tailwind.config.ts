@@ -57,6 +57,11 @@ export default {
           border: "hsl(var(--sidebar-border))",
           ring: "hsl(var(--sidebar-ring))",
         },
+        cluster: {
+          high: "hsl(0 65% 51%)",
+          medium: "hsl(38 92% 50%)",
+          low: "hsl(152 24% 42%)",
+        },
       },
       borderRadius: {
         lg: "var(--radius)",
