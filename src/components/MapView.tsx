@@ -12,9 +12,10 @@ interface MapViewProps {
     severity: "high" | "medium" | "low";
     metrics: any;
   }>;
+  isAnalyzing?: boolean;
 }
 
-const MapView = ({ onAreaSelected, clusters }: MapViewProps) => {
+const MapView = ({ onAreaSelected, clusters, isAnalyzing }: MapViewProps) => {
   const mapContainer = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
   const [drawMode, setDrawMode] = useState<"polygon" | "circle" | null>(null);
@@ -178,6 +179,7 @@ const MapView = ({ onAreaSelected, clusters }: MapViewProps) => {
           size="icon"
           onClick={() => setDrawMode(drawMode === "polygon" ? null : "polygon")}
           className="brutalist-shadow bg-card"
+          disabled={isAnalyzing}
         >
           <Square className="h-4 w-4" />
         </Button>
@@ -186,6 +188,7 @@ const MapView = ({ onAreaSelected, clusters }: MapViewProps) => {
           size="icon"
           onClick={() => setDrawMode(drawMode === "circle" ? null : "circle")}
           className="brutalist-shadow bg-card"
+          disabled={isAnalyzing}
         >
           <Circle className="h-4 w-4" />
         </Button>
@@ -197,6 +200,7 @@ const MapView = ({ onAreaSelected, clusters }: MapViewProps) => {
             setDrawMode(null);
           }}
           className="brutalist-shadow bg-card"
+          disabled={isAnalyzing}
         >
           <MapPin className="h-4 w-4" />
         </Button>
