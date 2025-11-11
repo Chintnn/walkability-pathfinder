@@ -9,7 +9,7 @@ export const transformBackendClusters = (
   return backendClusters.map((cluster) => ({
     id: cluster.id.toString(),
     geometry: {
-      coordinates: [[cluster.coordinates[1], cluster.coordinates[0]]], // Convert to [lon, lat] for GeoJSON
+      coordinates: [[cluster.coordinates[0], cluster.coordinates[1]]], // Convert to [lon, lat] for GeoJSON
     },
     severity: cluster.risk_level.toLowerCase() as "high" | "medium" | "low",
     metrics: {
