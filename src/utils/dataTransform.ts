@@ -2,45 +2,58 @@ import { BackendCluster, FrontendCluster } from "@/types/backend";
 
 /**
  * Transform backend cluster data to frontend format
- * Fix: Ensure coordinates are in [lat, lon] order for Leaflet
+ * Guarantees valid [lat, lon] for Leaflet
  */
 export const transformBackendClusters = (
   backendClusters: BackendCluster[]
 ): FrontendCluster[] => {
   return backendClusters
-    .filter(
-      (cluster) =>
-        Array.isArray(cluster.coordinates) &&
-        cluster.coordinates.length === 2 &&
-        typeof cluster.coordinates[0] === "number" &&
-        typeof cluster.coordinates[1] === "number"
-    )
     .map((cluster) => {
-      const [lat, lon] = cluster.coordinates; // ✅ Backend already sends [lat, lon]
+      const coords = cluster.coordinates ?? [];
+
+      // Validate coordinates
+      let lat = Number(coords[0]);
+      let lon = Number(coords[1]);
+
+      // Auto-swap if backend accidentally sent [lon, lat]
+      if (Math.abs(lat) > 90 && Math.abs(lon) <= 90) {
+        [lat, lon] = [lon, lat];
+      }
+
+      // Skip invalid coordinates
+      if (!isFinite(lat) || !isFinite(lon)) return null;
 
       return {
-        id: cluster.id.toString(),
+        id: cluster.id?.toString() || crypto.randomUUID(),
         geometry: {
-          coordinates: [lat, lon], // ✅ Keep same order [lat, lon]
+          coordinates: [lat, lon] as [number, number],
         },
-        severity: cluster.risk_level
-          ? cluster.risk_level.toLowerCase() as "high" | "medium" | "low"
-          : "low",
+        severity: (cluster.risk_level || "Low").toLowerCase() as
+          | "high"
+          | "medium"
+          | "low",
         metrics: {
-          score: getSeverityScore(cluster.risk_level || "low"),
+          score: getSeverityScore(cluster.risk_level || "Low"),
           name: cluster.name || `Cluster ${cluster.id}`,
         },
       };
-    });
+    })
+    .filter(Boolean) as FrontendCluster[];
 };
 
 /**
- * Convert risk level to numeric score
+ * Convert textual risk level to numeric score (0–100)
  */
 const getSeverityScore = (riskLevel: string): number => {
-  const normalized = riskLevel?.toLowerCase?.() || "low";
-  if (normalized === "high") return 25;
-  if (normalized === "medium") return 50;
-  if (normalized === "low") return 75;
-  return 50; // default
+  const normalized = (riskLevel || "low").toLowerCase();
+  switch (normalized) {
+    case "high":
+      return 25;
+    case "medium":
+      return 50;
+    case "low":
+      return 75;
+    default:
+      return 50;
+  }
 };
