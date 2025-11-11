@@ -3,11 +3,20 @@ import Header from "@/components/Header";
 import MapView from "@/components/MapView";
 import AnalysisPanel from "@/components/AnalysisPanel";
 import { toast } from "sonner";
+import { getApiUrl } from "@/config/api";
+import { BackendAnalysisResponse } from "@/types/backend";
+import { transformBackendClusters } from "@/utils/dataTransform";
 
 const Index = () => {
   const [analysisData, setAnalysisData] = useState<any>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [selectedArea, setSelectedArea] = useState<any>(null);
+
+  const calculateAverageScore = (clusters: any[]) => {
+    if (!clusters || clusters.length === 0) return 0;
+    const sum = clusters.reduce((acc, c) => acc + c.metrics.score, 0);
+    return Math.round(sum / clusters.length);
+  };
 
   const handleSearch = async (query: string) => {
     setIsAnalyzing(true);
@@ -34,41 +43,45 @@ const Index = () => {
       const lat = parseFloat(location.lat);
       const lon = parseFloat(location.lon);
 
-      // Step 2: Call your FastAPI backend via ngrok
-      toast.info("Contacting backend for analysis...", {
-        description: "Running AI model on FastAPI server",
+      // Step 2: Call FastAPI backend for analysis
+      toast.info("Analyzing walkability...", {
+        description: "Processing OSM data with AI model",
       });
 
       try {
-        const backendResponse = await fetch(
-          "https://unhelpable-acridly-rylee.ngrok-free.dev/analyze",
-          {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({ lat, lon }),
-          }
-        );
+        const backendResponse = await fetch(getApiUrl("ANALYZE"), {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ lat, lon }),
+        });
 
         if (!backendResponse.ok) {
           throw new Error(`Backend error: ${backendResponse.status}`);
         }
 
-        const backendData = await backendResponse.json();
-        console.log("Backend Data:", backendData);
+        const backendData: BackendAnalysisResponse = await backendResponse.json();
+        console.log("Backend Response:", backendData);
 
-        // ✅ Use the actual backend data for visualization
-        setAnalysisData(backendData);
+        // Transform backend data to frontend format
+        const transformedClusters = transformBackendClusters(backendData.clusters);
+        
+        setAnalysisData({
+          clusters: transformedClusters,
+          avgWalkabilityScore: calculateAverageScore(transformedClusters),
+        });
 
         toast.success("Analysis complete!", {
-          description: "Results loaded from FastAPI backend",
+          description: `Found ${transformedClusters.length} walkability clusters`,
         });
       } catch (error) {
-        console.error("Error calling backend:", error);
-        toast.error("Backend request failed", {
-          description: "Please check your FastAPI server or ngrok link.",
+        console.error("Backend error:", error);
+        toast.error("Analysis failed", {
+          description: "Please check your API configuration in src/config/api.ts",
         });
+        setIsAnalyzing(false);
+        return;
       }
 
       // Step 3: Create bounding box (for visualization)

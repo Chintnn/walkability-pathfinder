@@ -96,10 +96,9 @@ const MapView = ({ clusters, selectedArea }: MapViewProps) => {
 
       marker.bindPopup(`
         <div class="p-2">
-          <strong class="font-bold">Walkability Score: ${cluster.metrics.score}</strong><br/>
-          Severity: ${cluster.severity.toUpperCase()}<br/>
-          Sidewalk Coverage: ${cluster.metrics.sidewalk_pct}%<br/>
-          Intersection Density: ${cluster.metrics.intersection_density}/km²
+          <strong class="font-bold">${cluster.metrics.name}</strong><br/>
+          <span style="color: ${color}">Severity: ${cluster.severity.toUpperCase()}</span><br/>
+          Walkability Score: ${cluster.metrics.score}/100
         </div>
       `);
 
