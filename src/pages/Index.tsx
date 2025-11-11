@@ -8,28 +8,62 @@ import { toast } from "sonner";
 const Index = () => {
   const [analysisData, setAnalysisData] = useState<any>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [selectedArea, setSelectedArea] = useState<any>(null);
 
-  const handleAreaSelected = (geometry: any) => {
+  const handleSearch = async (query: string) => {
     setIsAnalyzing(true);
-    toast.info("Analyzing area...", {
-      description: "Fetching OpenStreetMap data and running AI analysis"
-    });
-
-    // Simulate API call with mock data
-    setTimeout(() => {
-      const mockData = generateMockAnalysisData();
-      setAnalysisData(mockData);
-      setIsAnalyzing(false);
-      toast.success("Analysis complete!", {
-        description: `Found ${mockData.clusters.length} bottleneck areas`
-      });
-    }, 2000);
-  };
-
-  const handleSearch = (query: string) => {
     toast.info("Searching location...", {
       description: query
     });
+
+    try {
+      // Use Nominatim geocoding API
+      const response = await fetch(
+        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=1`
+      );
+      const data = await response.json();
+
+      if (data.length === 0) {
+        toast.error("Location not found", {
+          description: "Please try a different search term"
+        });
+        setIsAnalyzing(false);
+        return;
+      }
+
+      const location = data[0];
+      const lat = parseFloat(location.lat);
+      const lon = parseFloat(location.lon);
+
+      // Create a bounding box (approximately 1km x 1km)
+      const offset = 0.005; // roughly 0.5km in degrees
+      const boundingBox = [
+        [lat - offset, lon - offset],
+        [lat + offset, lon + offset]
+      ];
+
+      setSelectedArea({ lat, lon, boundingBox });
+
+      toast.info("Analyzing area...", {
+        description: "Fetching OpenStreetMap data and running AI analysis"
+      });
+
+      // Simulate API call with mock data
+      setTimeout(() => {
+        const mockData = generateMockAnalysisData();
+        setAnalysisData(mockData);
+        setIsAnalyzing(false);
+        toast.success("Analysis complete!", {
+          description: `Found ${mockData.clusters.length} bottleneck areas`
+        });
+      }, 2000);
+    } catch (error) {
+      console.error("Search error:", error);
+      toast.error("Search failed", {
+        description: "Please try again"
+      });
+      setIsAnalyzing(false);
+    }
   };
 
   const handleSimulate = (recommendations: string[]) => {
@@ -62,14 +96,14 @@ const Index = () => {
 
   return (
     <div className="h-screen flex flex-col bg-background">
-      <Header onSearch={handleSearch} />
+      <Header onSearch={handleSearch} isSearching={isAnalyzing} />
       
       <div className="flex-1 flex overflow-hidden">
         {/* Map Section */}
         <div className="flex-1 p-4">
           <MapView 
-            onAreaSelected={handleAreaSelected}
             clusters={analysisData?.clusters}
+            selectedArea={selectedArea}
           />
         </div>
 

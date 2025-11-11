@@ -1,24 +1,25 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
-import { Button } from "./ui/button";
-import { MapPin, Square, Circle } from "lucide-react";
 
 interface MapViewProps {
-  onAreaSelected: (geometry: any) => void;
   clusters?: Array<{
     id: string;
     geometry: any;
     severity: "high" | "medium" | "low";
     metrics: any;
   }>;
+  selectedArea?: {
+    lat: number;
+    lon: number;
+    boundingBox: number[][];
+  };
 }
 
-const MapView = ({ onAreaSelected, clusters }: MapViewProps) => {
+const MapView = ({ clusters, selectedArea }: MapViewProps) => {
   const mapContainer = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
-  const [drawMode, setDrawMode] = useState<"polygon" | "circle" | null>(null);
-  const drawnLayersRef = useRef<L.LayerGroup>(new L.LayerGroup());
+  const selectedAreaLayerRef = useRef<L.Rectangle | null>(null);
 
   useEffect(() => {
     if (!mapContainer.current || mapRef.current) return;
@@ -40,95 +41,37 @@ const MapView = ({ onAreaSelected, clusters }: MapViewProps) => {
     // Add zoom control to top right
     L.control.zoom({ position: "topright" }).addTo(map);
 
-    // Add drawn layers group
-    drawnLayersRef.current.addTo(map);
-
     return () => {
       map.remove();
     };
   }, []);
 
-  // Handle drawing
+  // Handle selected area display
   useEffect(() => {
-    if (!mapRef.current || !drawMode) return;
+    if (!mapRef.current || !selectedArea) return;
 
     const map = mapRef.current;
-    let tempLayer: L.Circle | L.Polygon | null = null;
-    let latlngs: L.LatLng[] = [];
 
-    const handleMapClick = (e: L.LeafletMouseEvent) => {
-      if (drawMode === "polygon") {
-        latlngs.push(e.latlng);
-        
-        if (tempLayer) {
-          map.removeLayer(tempLayer);
-        }
+    // Remove previous selected area
+    if (selectedAreaLayerRef.current) {
+      map.removeLayer(selectedAreaLayerRef.current);
+    }
 
-        if (latlngs.length > 0) {
-          tempLayer = L.polygon(latlngs, {
-            color: "hsl(152 24% 42%)",
-            weight: 3,
-            fillOpacity: 0.1,
-          }).addTo(map);
-        }
-      } else if (drawMode === "circle") {
-        if (tempLayer) {
-          map.removeLayer(tempLayer);
-        }
-        tempLayer = L.circle(e.latlng, {
-          radius: 500,
-          color: "hsl(152 24% 42%)",
-          weight: 3,
-          fillOpacity: 0.1,
-        }).addTo(map);
+    // Add new selected area
+    const bounds: L.LatLngBoundsExpression = [
+      [selectedArea.boundingBox[0][0], selectedArea.boundingBox[0][1]],
+      [selectedArea.boundingBox[1][0], selectedArea.boundingBox[1][1]]
+    ];
 
-        const bounds = tempLayer.getBounds();
-        const geometry = {
-          type: "Polygon",
-          coordinates: [[
-            [bounds.getSouthWest().lng, bounds.getSouthWest().lat],
-            [bounds.getNorthWest().lng, bounds.getNorthWest().lat],
-            [bounds.getNorthEast().lng, bounds.getNorthEast().lat],
-            [bounds.getSouthEast().lng, bounds.getSouthEast().lat],
-            [bounds.getSouthWest().lng, bounds.getSouthWest().lat],
-          ]],
-        };
+    selectedAreaLayerRef.current = L.rectangle(bounds, {
+      color: "hsl(152 24% 42%)",
+      weight: 3,
+      fillOpacity: 0.1,
+    }).addTo(map);
 
-        drawnLayersRef.current.addLayer(tempLayer);
-        onAreaSelected(geometry);
-        setDrawMode(null);
-      }
-    };
-
-    const handleMapDblClick = () => {
-      if (drawMode === "polygon" && latlngs.length > 2) {
-        if (tempLayer) {
-          const geometry = {
-            type: "Polygon",
-            coordinates: [
-              latlngs.map(ll => [ll.lng, ll.lat]).concat([[latlngs[0].lng, latlngs[0].lat]])
-            ],
-          };
-
-          drawnLayersRef.current.addLayer(tempLayer);
-          onAreaSelected(geometry);
-          setDrawMode(null);
-          latlngs = [];
-        }
-      }
-    };
-
-    map.on("click", handleMapClick);
-    map.on("dblclick", handleMapDblClick);
-
-    return () => {
-      map.off("click", handleMapClick);
-      map.off("dblclick", handleMapDblClick);
-      if (tempLayer) {
-        map.removeLayer(tempLayer);
-      }
-    };
-  }, [drawMode, onAreaSelected]);
+    // Fit map to bounds
+    map.fitBounds(bounds, { padding: [50, 50] });
+  }, [selectedArea]);
 
   // Render clusters
   useEffect(() => {
@@ -171,46 +114,6 @@ const MapView = ({ onAreaSelected, clusters }: MapViewProps) => {
   return (
     <div className="relative h-full w-full">
       <div ref={mapContainer} className="h-full w-full brutalist-border" />
-      
-      <div className="absolute top-4 left-4 flex flex-col gap-2 z-[1000]">
-        <Button
-          variant={drawMode === "polygon" ? "default" : "outline"}
-          size="icon"
-          onClick={() => setDrawMode(drawMode === "polygon" ? null : "polygon")}
-          className="brutalist-shadow bg-card"
-        >
-          <Square className="h-4 w-4" />
-        </Button>
-        <Button
-          variant={drawMode === "circle" ? "default" : "outline"}
-          size="icon"
-          onClick={() => setDrawMode(drawMode === "circle" ? null : "circle")}
-          className="brutalist-shadow bg-card"
-        >
-          <Circle className="h-4 w-4" />
-        </Button>
-        <Button
-          variant="outline"
-          size="icon"
-          onClick={() => {
-            drawnLayersRef.current.clearLayers();
-            setDrawMode(null);
-          }}
-          className="brutalist-shadow bg-card"
-        >
-          <MapPin className="h-4 w-4" />
-        </Button>
-      </div>
-
-      {drawMode && (
-        <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-card px-6 py-3 brutalist-border brutalist-shadow z-[1000]">
-          <p className="text-sm font-bold">
-            {drawMode === "polygon" 
-              ? "Click to add points. Double-click to finish." 
-              : "Click to place circular area"}
-          </p>
-        </div>
-      )}
     </div>
   );
 };
