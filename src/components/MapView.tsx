@@ -66,34 +66,44 @@ const MapView = ({ clusters, selectedArea }: MapViewProps) => {
     map.fitBounds(bounds, { padding: [50, 50] });
   }, [selectedArea]);
 
-  // 🔴 Render clusters
+  // 🔴 Render clusters (with safety and debug logging)
   useEffect(() => {
     if (!mapRef.current || !clusters) return;
 
     const map = mapRef.current;
     const clusterLayers: L.CircleMarker[] = [];
 
+    console.log("🌍 Incoming clusters:", clusters);
+
     clusters.forEach((cluster) => {
-      const coords = cluster.geometry?.coordinates;
+      console.log("🧩 Processing cluster:", cluster);
 
-      console.log("🧩 Cluster raw coords:", coords);
+      let coords: any = cluster.geometry?.coordinates;
 
-      if (
-        !Array.isArray(coords) ||
-        coords.length < 2 ||
-        typeof coords[0] !== "number" ||
-        typeof coords[1] !== "number"
-      ) {
-        console.warn("⚠️ Skipping invalid cluster:", cluster);
+      // Handle both shapes: [lat, lon] or [[lat, lon]]
+      if (!coords) {
+        console.warn("⚠️ Missing coordinates:", cluster);
         return;
       }
 
-      let [lat, lon] = coords;
+      if (Array.isArray(coords[0])) {
+        coords = coords[0]; // unwrap if nested
+      }
 
-      // If swapped accidentally
+      let [lat, lon] = coords || [];
+
+      // Auto-fix if [lon, lat] was sent accidentally
       if (Math.abs(lat) > 90 && Math.abs(lon) <= 90) {
         [lat, lon] = [lon, lat];
       }
+
+      // Skip invalid or undefined coords
+      if (!isFinite(lat) || !isFinite(lon)) {
+        console.warn("⚠️ Invalid coords, skipping cluster:", cluster);
+        return;
+      }
+
+      console.log(`✅ Valid coords for ${cluster.id}: lat=${lat}, lon=${lon}`);
 
       const color =
         cluster.severity === "high"
@@ -103,7 +113,7 @@ const MapView = ({ clusters, selectedArea }: MapViewProps) => {
           : "hsl(152 24% 42%)";
 
       const marker = L.circleMarker([lat, lon], {
-        radius: 12,
+        radius: cluster.severity === "high" ? 14 : cluster.severity === "medium" ? 10 : 8,
         color,
         weight: 3,
         fillOpacity: 0.3,
@@ -111,7 +121,7 @@ const MapView = ({ clusters, selectedArea }: MapViewProps) => {
 
       marker.bindPopup(`
         <div class="p-2">
-          <strong>${cluster.metrics?.name || "Unknown"}</strong><br/>
+          <strong>${cluster.metrics?.name || "Unknown Cluster"}</strong><br/>
           <span style="color:${color}">
             Severity: ${cluster.severity?.toUpperCase() || "N/A"}
           </span><br/>
@@ -122,7 +132,7 @@ const MapView = ({ clusters, selectedArea }: MapViewProps) => {
       clusterLayers.push(marker);
     });
 
-    // Clean up markers when clusters update
+    // Cleanup markers on update
     return () => {
       clusterLayers.forEach((layer) => map.removeLayer(layer));
     };
