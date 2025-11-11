@@ -5,7 +5,6 @@ import AnalysisPanel from "@/components/AnalysisPanel";
 import { generateMockAnalysisData } from "@/lib/mockData";
 import { toast } from "sonner";
 
-
 const Index = () => {
   const [analysisData, setAnalysisData] = useState<any>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -13,20 +12,20 @@ const Index = () => {
 
   const handleSearch = async (query: string) => {
     setIsAnalyzing(true);
-    toast.info("Searching location...", {
-      description: query
-    });
+    toast.info("Searching location...", { description: query });
 
     try {
-      // Use Nominatim geocoding API
+      // Step 1: Get location coordinates using OpenStreetMap API
       const response = await fetch(
-        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=1`
+        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(
+          query
+        )}&limit=1`
       );
       const data = await response.json();
 
       if (data.length === 0) {
         toast.error("Location not found", {
-          description: "Please try a different search term"
+          description: "Please try a different search term",
         });
         setIsAnalyzing(false);
         return;
@@ -36,55 +35,61 @@ const Index = () => {
       const lat = parseFloat(location.lat);
       const lon = parseFloat(location.lon);
 
-
-      // start of changes - fast api link
-
-      // Call your FastAPI backend through ngrok
+      // Step 2: Call your FastAPI backend via ngrok
       try {
-        const backendResponse = await fetch("https://https://unhelpable-acridly-rylee.ngrok-free.dev/analyze", {
-        method: "POST",
-         headers: {
-           "Content-Type": "application/json",
-         },
-      body: JSON.stringify({ lat, lon }),
-      });
-      const backendData = await backendResponse.json();
-      console.log("Backend Data:", backendData);
-      // Example: Update analysis panel
-      setAnalysisData(backendData);
+        const backendResponse = await fetch(
+          "https://unhelpable-acridly-rylee.ngrok-free.dev/analyze",
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ lat, lon }),
+          }
+        );
+
+        if (!backendResponse.ok) {
+          throw new Error(`Backend error: ${backendResponse.status}`);
+        }
+
+        const backendData = await backendResponse.json();
+        console.log("Backend Data:", backendData);
+
+        // Update the analysis panel with backend data
+        setAnalysisData(backendData);
       } catch (error) {
         console.error("Error calling backend:", error);
+        toast.error("Backend request failed", {
+          description: "Please check your FastAPI server and ngrok link.",
+        });
       }
 
-      // end of changes - fast api link
-
-      
-      // Create a bounding box (approximately 1km x 1km)
-      const offset = 0.005; // roughly 0.5km in degrees
+      // Step 3: Generate bounding box for display
+      const offset = 0.005; // roughly 0.5km
       const boundingBox = [
         [lat - offset, lon - offset],
-        [lat + offset, lon + offset]
+        [lat + offset, lon + offset],
       ];
 
       setSelectedArea({ lat, lon, boundingBox });
 
       toast.info("Analyzing area...", {
-        description: "Fetching OpenStreetMap data and running AI analysis"
+        description: "Fetching OpenStreetMap data and running AI analysis",
       });
 
-      // Simulate API call with mock data
+      // Step 4: Simulate mock AI output (optional)
       setTimeout(() => {
         const mockData = generateMockAnalysisData();
         setAnalysisData(mockData);
         setIsAnalyzing(false);
         toast.success("Analysis complete!", {
-          description: `Found ${mockData.clusters.length} bottleneck areas`
+          description: `Found ${mockData.clusters.length} bottleneck areas`,
         });
       }, 2000);
     } catch (error) {
       console.error("Search error:", error);
       toast.error("Search failed", {
-        description: "Please try again"
+        description: "Please try again.",
       });
       setIsAnalyzing(false);
     }
@@ -92,19 +97,19 @@ const Index = () => {
 
   const handleSimulate = (recommendations: string[]) => {
     toast.success("Simulation running...", {
-      description: `Applying ${recommendations.length} interventions`
+      description: `Applying ${recommendations.length} interventions`,
     });
-    
+
     setTimeout(() => {
       toast.success("Simulation complete!", {
-        description: "Impact estimates updated"
+        description: "Impact estimates updated",
       });
     }, 1500);
   };
 
   const handleGenerateReport = () => {
     toast.success("Generating policy report...", {
-      description: "Your PDF will download shortly"
+      description: "Your PDF will download shortly",
     });
 
     setTimeout(() => {
@@ -112,8 +117,8 @@ const Index = () => {
         description: "Download starting now",
         action: {
           label: "Download",
-          onClick: () => console.log("Download report")
-        }
+          onClick: () => console.log("Download report"),
+        },
       });
     }, 1500);
   };
@@ -121,14 +126,11 @@ const Index = () => {
   return (
     <div className="h-screen flex flex-col bg-background">
       <Header onSearch={handleSearch} isSearching={isAnalyzing} />
-      
+
       <div className="flex-1 flex overflow-hidden">
         {/* Map Section */}
         <div className="flex-1 p-4">
-          <MapView 
-            clusters={analysisData?.clusters}
-            selectedArea={selectedArea}
-          />
+          <MapView clusters={analysisData?.clusters} selectedArea={selectedArea} />
         </div>
 
         {/* Analysis Panel */}
