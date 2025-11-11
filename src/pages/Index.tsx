@@ -5,6 +5,7 @@ import AnalysisPanel from "@/components/AnalysisPanel";
 import { generateMockAnalysisData } from "@/lib/mockData";
 import { toast } from "sonner";
 
+
 const Index = () => {
   const [analysisData, setAnalysisData] = useState<any>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
