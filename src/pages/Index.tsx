@@ -2,7 +2,6 @@ import { useState } from "react";
 import Header from "@/components/Header";
 import MapView from "@/components/MapView";
 import AnalysisPanel from "@/components/AnalysisPanel";
-import { generateMockAnalysisData } from "@/lib/mockData";
 import { toast } from "sonner";
 
 const Index = () => {
@@ -36,6 +35,10 @@ const Index = () => {
       const lon = parseFloat(location.lon);
 
       // Step 2: Call your FastAPI backend via ngrok
+      toast.info("Contacting backend for analysis...", {
+        description: "Running AI model on FastAPI server",
+      });
+
       try {
         const backendResponse = await fetch(
           "https://unhelpable-acridly-rylee.ngrok-free.dev/analyze",
@@ -55,16 +58,20 @@ const Index = () => {
         const backendData = await backendResponse.json();
         console.log("Backend Data:", backendData);
 
-        // Update the analysis panel with backend data
+        // ✅ Use the actual backend data for visualization
         setAnalysisData(backendData);
+
+        toast.success("Analysis complete!", {
+          description: "Results loaded from FastAPI backend",
+        });
       } catch (error) {
         console.error("Error calling backend:", error);
         toast.error("Backend request failed", {
-          description: "Please check your FastAPI server and ngrok link.",
+          description: "Please check your FastAPI server or ngrok link.",
         });
       }
 
-      // Step 3: Generate bounding box for display
+      // Step 3: Create bounding box (for visualization)
       const offset = 0.005; // roughly 0.5km
       const boundingBox = [
         [lat - offset, lon - offset],
@@ -72,20 +79,7 @@ const Index = () => {
       ];
 
       setSelectedArea({ lat, lon, boundingBox });
-
-      toast.info("Analyzing area...", {
-        description: "Fetching OpenStreetMap data and running AI analysis",
-      });
-
-      // Step 4: Simulate mock AI output (optional)
-      setTimeout(() => {
-        const mockData = generateMockAnalysisData();
-        setAnalysisData(mockData);
-        setIsAnalyzing(false);
-        toast.success("Analysis complete!", {
-          description: `Found ${mockData.clusters.length} bottleneck areas`,
-        });
-      }, 2000);
+      setIsAnalyzing(false);
     } catch (error) {
       console.error("Search error:", error);
       toast.error("Search failed", {
@@ -130,7 +124,10 @@ const Index = () => {
       <div className="flex-1 flex overflow-hidden">
         {/* Map Section */}
         <div className="flex-1 p-4">
-          <MapView clusters={analysisData?.clusters} selectedArea={selectedArea} />
+          <MapView
+            clusters={analysisData?.clusters}
+            selectedArea={selectedArea}
+          />
         </div>
 
         {/* Analysis Panel */}
