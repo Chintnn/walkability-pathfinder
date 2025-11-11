@@ -49,7 +49,6 @@ const MapView = ({ clusters, selectedArea }: MapViewProps) => {
     if (!mapRef.current || !selectedArea) return;
     const map = mapRef.current;
 
-    // Remove previous selection
     if (selectedAreaLayerRef.current) {
       map.removeLayer(selectedAreaLayerRef.current);
     }
@@ -68,7 +67,7 @@ const MapView = ({ clusters, selectedArea }: MapViewProps) => {
     map.fitBounds(bounds, { padding: [50, 50] });
   }, [selectedArea]);
 
-  // 🔴 Render clusters safely
+  // 🔴 Render clusters safely + debug log
   useEffect(() => {
     if (!mapRef.current || !clusters) return;
 
@@ -76,11 +75,12 @@ const MapView = ({ clusters, selectedArea }: MapViewProps) => {
     const clusterLayers: L.CircleMarker[] = [];
 
     clusters.forEach((cluster) => {
-      // --- ✅ FIX: Safe coordinate extraction ---
       let coords: any = cluster.geometry?.coordinates;
+      console.log("🧩 Cluster raw coords:", coords);
+
       if (!coords) return; // skip if missing
 
-      // unwrap nested arrays
+      // unwrap nested arrays until [lat, lon]
       while (Array.isArray(coords[0])) coords = coords[0];
 
       let [lat, lon] = coords ?? [];
@@ -88,9 +88,14 @@ const MapView = ({ clusters, selectedArea }: MapViewProps) => {
       // swap if order reversed
       if (Math.abs(lat) > 90 && Math.abs(lon) <= 90) [lat, lon] = [lon, lat];
 
-      // skip invalid coordinates
-      if (!isFinite(lat) || !isFinite(lon)) {
-        console.warn("⚠ Skipping invalid cluster:", cluster);
+      // validate coordinates
+      if (
+        typeof lat !== "number" ||
+        typeof lon !== "number" ||
+        isNaN(lat) ||
+        isNaN(lon)
+      ) {
+        console.warn("⚠️ Skipping invalid cluster:", cluster);
         return;
       }
 
@@ -121,7 +126,6 @@ const MapView = ({ clusters, selectedArea }: MapViewProps) => {
       clusterLayers.push(marker);
     });
 
-    // cleanup
     return () => {
       clusterLayers.forEach((layer) => map.removeLayer(layer));
     };
