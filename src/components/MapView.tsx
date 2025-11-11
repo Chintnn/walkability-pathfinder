@@ -21,30 +21,29 @@ const MapView = ({ clusters, selectedArea }: MapViewProps) => {
   const mapRef = useRef<L.Map | null>(null);
   const selectedAreaLayerRef = useRef<L.Rectangle | null>(null);
 
-  // 🗺️ Initialize map
+  // 🗺️ Initialize the map
   useEffect(() => {
     if (!mapContainer.current || mapRef.current) return;
 
     const map = L.map(mapContainer.current, {
-      center: [12.9716, 77.5946], // Default center: Bangalore
+      center: [12.9716, 77.5946], // Default: Bangalore
       zoom: 13,
       zoomControl: false,
     });
 
     mapRef.current = map;
 
-    // Add OpenStreetMap tiles
+    // Add base layer
     L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
       attribution: "© OpenStreetMap contributors",
     }).addTo(map);
 
-    // Zoom control on top right
     L.control.zoom({ position: "topright" }).addTo(map);
 
     return () => map.remove();
   }, []);
 
-  // 🟩 Display selected area
+  // 🟩 Show selected area
   useEffect(() => {
     if (!mapRef.current || !selectedArea) return;
     const map = mapRef.current;
@@ -67,7 +66,7 @@ const MapView = ({ clusters, selectedArea }: MapViewProps) => {
     map.fitBounds(bounds, { padding: [50, 50] });
   }, [selectedArea]);
 
-  // 🔴 Render clusters safely + debug log
+  // 🔴 Render clusters
   useEffect(() => {
     if (!mapRef.current || !clusters) return;
 
@@ -75,28 +74,25 @@ const MapView = ({ clusters, selectedArea }: MapViewProps) => {
     const clusterLayers: L.CircleMarker[] = [];
 
     clusters.forEach((cluster) => {
-      let coords: any = cluster.geometry?.coordinates;
+      const coords = cluster.geometry?.coordinates;
+
       console.log("🧩 Cluster raw coords:", coords);
 
-      if (!coords) return; // skip if missing
-
-      // unwrap nested arrays until [lat, lon]
-      while (Array.isArray(coords[0])) coords = coords[0];
-
-      let [lat, lon] = coords ?? [];
-
-      // swap if order reversed
-      if (Math.abs(lat) > 90 && Math.abs(lon) <= 90) [lat, lon] = [lon, lat];
-
-      // validate coordinates
       if (
-        typeof lat !== "number" ||
-        typeof lon !== "number" ||
-        isNaN(lat) ||
-        isNaN(lon)
+        !Array.isArray(coords) ||
+        coords.length < 2 ||
+        typeof coords[0] !== "number" ||
+        typeof coords[1] !== "number"
       ) {
         console.warn("⚠️ Skipping invalid cluster:", cluster);
         return;
+      }
+
+      let [lat, lon] = coords;
+
+      // If swapped accidentally
+      if (Math.abs(lat) > 90 && Math.abs(lon) <= 90) {
+        [lat, lon] = [lon, lat];
       }
 
       const color =
@@ -126,6 +122,7 @@ const MapView = ({ clusters, selectedArea }: MapViewProps) => {
       clusterLayers.push(marker);
     });
 
+    // Clean up markers when clusters update
     return () => {
       clusterLayers.forEach((layer) => map.removeLayer(layer));
     };
