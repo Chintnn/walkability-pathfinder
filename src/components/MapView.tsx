@@ -26,29 +26,30 @@ const MapView = ({ clusters, selectedArea }: MapViewProps) => {
     if (!mapContainer.current || mapRef.current) return;
 
     const map = L.map(mapContainer.current, {
-      center: [12.9716, 77.5946], // Default: Bangalore
+      center: [12.9716, 77.5946], // Default center: Bangalore
       zoom: 13,
       zoomControl: false,
     });
 
     mapRef.current = map;
 
+    // Add OpenStreetMap tiles
     L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
       attribution: "© OpenStreetMap contributors",
     }).addTo(map);
 
+    // Zoom control on top right
     L.control.zoom({ position: "topright" }).addTo(map);
 
-    return () => {
-      map.remove();
-    };
+    return () => map.remove();
   }, []);
 
-  // 🟩 Draw selected bounding box
+  // 🟩 Display selected area
   useEffect(() => {
     if (!mapRef.current || !selectedArea) return;
     const map = mapRef.current;
 
+    // Remove previous selection
     if (selectedAreaLayerRef.current) {
       map.removeLayer(selectedAreaLayerRef.current);
     }
@@ -67,7 +68,7 @@ const MapView = ({ clusters, selectedArea }: MapViewProps) => {
     map.fitBounds(bounds, { padding: [50, 50] });
   }, [selectedArea]);
 
-  // 🔴 Draw clusters safely
+  // 🔴 Render clusters safely
   useEffect(() => {
     if (!mapRef.current || !clusters) return;
 
@@ -75,23 +76,21 @@ const MapView = ({ clusters, selectedArea }: MapViewProps) => {
     const clusterLayers: L.CircleMarker[] = [];
 
     clusters.forEach((cluster) => {
-      if (!cluster?.geometry?.coordinates) return;
+      // --- ✅ FIX: Safe coordinate extraction ---
+      let coords: any = cluster.geometry?.coordinates;
+      if (!coords) return; // skip if missing
 
-      // Handle both flat and nested coordinate formats
-      let rawCoords = cluster.geometry.coordinates;
-      if (Array.isArray(rawCoords[0])) rawCoords = rawCoords[0]; // unwrap one level
-      if (Array.isArray(rawCoords[0])) rawCoords = rawCoords[0]; // unwrap twice if needed
+      // unwrap nested arrays
+      while (Array.isArray(coords[0])) coords = coords[0];
 
-      let [lat, lon] = rawCoords;
+      let [lat, lon] = coords ?? [];
 
-      // Auto-swap if order is reversed (lon first)
-      if (Math.abs(lat) > 90 && Math.abs(lon) <= 90) {
-        [lat, lon] = [lon, lat];
-      }
+      // swap if order reversed
+      if (Math.abs(lat) > 90 && Math.abs(lon) <= 90) [lat, lon] = [lon, lat];
 
-      // Validate coordinates
+      // skip invalid coordinates
       if (!isFinite(lat) || !isFinite(lon)) {
-        console.warn("Skipping invalid cluster coordinates:", cluster);
+        console.warn("⚠ Skipping invalid cluster:", cluster);
         return;
       }
 
@@ -104,15 +103,15 @@ const MapView = ({ clusters, selectedArea }: MapViewProps) => {
 
       const marker = L.circleMarker([lat, lon], {
         radius: 12,
-        color: color,
+        color,
         weight: 3,
         fillOpacity: 0.3,
       }).addTo(map);
 
       marker.bindPopup(`
         <div class="p-2">
-          <strong class="font-bold">${cluster.metrics?.name || "Unknown"}</strong><br/>
-          <span style="color: ${color}">
+          <strong>${cluster.metrics?.name || "Unknown"}</strong><br/>
+          <span style="color:${color}">
             Severity: ${cluster.severity?.toUpperCase() || "N/A"}
           </span><br/>
           Walkability Score: ${cluster.metrics?.score ?? "?"}/100
@@ -122,6 +121,7 @@ const MapView = ({ clusters, selectedArea }: MapViewProps) => {
       clusterLayers.push(marker);
     });
 
+    // cleanup
     return () => {
       clusterLayers.forEach((layer) => map.removeLayer(layer));
     };
