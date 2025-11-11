@@ -35,6 +35,29 @@ const Index = () => {
       const lat = parseFloat(location.lat);
       const lon = parseFloat(location.lon);
 
+
+      // start of changes - fast api link
+
+      // Call your FastAPI backend through ngrok
+      try {
+        const backendResponse = await fetch("https://https://unhelpable-acridly-rylee.ngrok-free.dev/analyze", {
+        method: "POST",
+         headers: {
+           "Content-Type": "application/json",
+         },
+      body: JSON.stringify({ lat, lon }),
+      });
+      const backendData = await backendResponse.json();
+      console.log("Backend Data:", backendData);
+      // Example: Update analysis panel
+      setAnalysisData(backendData);
+      } catch (error) {
+        console.error("Error calling backend:", error);
+      }
+
+      // end of changes - fast api link
+
+      
       // Create a bounding box (approximately 1km x 1km)
       const offset = 0.005; // roughly 0.5km in degrees
       const boundingBox = [
