@@ -5,115 +5,116 @@ import "leaflet/dist/leaflet.css";
 interface MapViewProps {
   clusters?: Array<{
     id: string;
-    geometry: any;
-    severity: "high" | "medium" | "low";
-    metrics: any;
+    geometry?: { coordinates?: [number, number] };
+    coordinates?: [number, number];
+    severity?: "high" | "medium" | "low" | string;
+    risk_level?: string;
+    name?: string;
+    description?: string;
   }>;
   selectedArea?: {
     lat: number;
     lon: number;
-    boundingBox: number[][];
+    boundingBox?: number[][];
   };
 }
 
-const MapView = ({ clusters, selectedArea }: MapViewProps) => {
+const MapView = ({ clusters = [], selectedArea }: MapViewProps) => {
   const mapContainer = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
-  const selectedAreaLayerRef = useRef<L.Rectangle | null>(null);
+  const markersRef = useRef<L.LayerGroup | null>(null);
 
+  // Initialize the map once
   useEffect(() => {
     if (!mapContainer.current || mapRef.current) return;
 
-    // Initialize map
     const map = L.map(mapContainer.current, {
-      center: [12.9716, 77.5946], // Bangalore
+      center: [12.9716, 77.5946], // Default center (Bangalore)
       zoom: 13,
-      zoomControl: false,
+      zoomControl: true,
     });
 
-    mapRef.current = map;
-
-    // Add tile layer
     L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-      attribution: '© OpenStreetMap contributors',
+      attribution: "© OpenStreetMap contributors",
     }).addTo(map);
 
-    // Add zoom control to top right
-    L.control.zoom({ position: "topright" }).addTo(map);
+    mapRef.current = map;
+    markersRef.current = L.layerGroup().addTo(map);
 
     return () => {
       map.remove();
     };
   }, []);
 
-  // Handle selected area display
+  // Update markers when clusters change
   useEffect(() => {
-    if (!mapRef.current || !selectedArea) return;
-
     const map = mapRef.current;
+    const markerLayer = markersRef.current;
+    if (!map || !markerLayer) return;
 
-    // Remove previous selected area
-    if (selectedAreaLayerRef.current) {
-      map.removeLayer(selectedAreaLayerRef.current);
-    }
-
-    // Add new selected area
-    const bounds: L.LatLngBoundsExpression = [
-      [selectedArea.boundingBox[0][0], selectedArea.boundingBox[0][1]],
-      [selectedArea.boundingBox[1][0], selectedArea.boundingBox[1][1]]
-    ];
-
-    selectedAreaLayerRef.current = L.rectangle(bounds, {
-      color: "hsl(152 24% 42%)",
-      weight: 3,
-      fillOpacity: 0.1,
-    }).addTo(map);
-
-    // Fit map to bounds
-    map.fitBounds(bounds, { padding: [50, 50] });
-  }, [selectedArea]);
-
-  // Render clusters
-  useEffect(() => {
-    if (!mapRef.current || !clusters) return;
-
-    const map = mapRef.current;
-    const clusterLayers: L.CircleMarker[] = [];
+    markerLayer.clearLayers();
 
     clusters.forEach((cluster) => {
-      const coords = cluster.geometry.coordinates[0]; // Access [lon, lat] array
-      const color = 
-        cluster.severity === "high" ? "hsl(0 65% 51%)" :
-        cluster.severity === "medium" ? "hsl(38 92% 50%)" :
-        "hsl(152 24% 42%)";
+      // Support both `geometry.coordinates` and `coordinates` directly
+      const coords =
+        cluster.coordinates ||
+        (cluster.geometry?.coordinates as [number, number] | undefined);
 
-      const marker = L.circleMarker([coords[1], coords[0]], {
-        radius: 12,
-        color: color,
-        weight: 3,
-        fillOpacity: 0.3,
-      }).addTo(map);
+      if (
+        !coords ||
+        coords.length !== 2 ||
+        isNaN(coords[0]) ||
+        isNaN(coords[1])
+      ) {
+        return; // skip invalid coordinates
+      }
 
-      marker.bindPopup(`
-        <div class="p-2">
-          <strong class="font-bold">${cluster.metrics.name}</strong><br/>
-          <span style="color: ${color}">Severity: ${cluster.severity.toUpperCase()}</span><br/>
-          Walkability Score: ${cluster.metrics.score}/100
-        </div>
-      `);
+      const [lat, lon] = coords;
+      const color =
+        cluster.risk_level === "High" || cluster.severity === "high"
+          ? "red"
+          : cluster.risk_level === "Medium" || cluster.severity === "medium"
+          ? "orange"
+          : "green";
 
-      clusterLayers.push(marker);
+      const marker = L.circleMarker([lat, lon], {
+        radius: 8,
+        fillColor: color,
+        color: "black",
+        weight: 1,
+        fillOpacity: 0.8,
+      }).bindPopup(
+        `<b>${cluster.name || "Area"}</b><br/>Risk: ${
+          cluster.risk_level || cluster.severity || "N/A"
+        }<br/>${cluster.description || ""}`
+      );
+
+      marker.addTo(markerLayer);
     });
-
-    return () => {
-      clusterLayers.forEach(layer => map.removeLayer(layer));
-    };
   }, [clusters]);
 
+  // Optional: Center map when selectedArea changes
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !selectedArea) return;
+
+    const { lat, lon } = selectedArea;
+    if (lat && lon && !isNaN(lat) && !isNaN(lon)) {
+      map.setView([lat, lon], 15);
+    }
+  }, [selectedArea]);
+
   return (
-    <div className="relative h-full w-full">
-      <div ref={mapContainer} className="h-full w-full brutalist-border" />
-    </div>
+    <div
+      ref={mapContainer}
+      id="map"
+      style={{
+        height: "100%",
+        width: "100%",
+        borderRadius: "12px",
+        overflow: "hidden",
+      }}
+    />
   );
 };
 
