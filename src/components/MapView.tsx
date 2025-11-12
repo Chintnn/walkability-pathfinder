@@ -21,24 +21,24 @@ const MapView = ({ clusters, selectedArea }: MapViewProps) => {
   const mapRef = useRef<L.Map | null>(null);
   const selectedAreaLayerRef = useRef<L.Rectangle | null>(null);
 
-  // 🗺️ Initialize the map
   useEffect(() => {
     if (!mapContainer.current || mapRef.current) return;
 
+    // Initialize map
     const map = L.map(mapContainer.current, {
-      center: [12.9716, 77.5946], // Default center (Bangalore)
+      center: [12.9716, 77.5946], // Bangalore
       zoom: 13,
       zoomControl: false,
     });
 
     mapRef.current = map;
 
-    // Add OSM tile layer
+    // Add tile layer
     L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-      attribution: "© OpenStreetMap contributors",
+      attribution: '© OpenStreetMap contributors',
     }).addTo(map);
 
-    // Add zoom control to top-right
+    // Add zoom control to top right
     L.control.zoom({ position: "topright" }).addTo(map);
 
     return () => {
@@ -46,18 +46,21 @@ const MapView = ({ clusters, selectedArea }: MapViewProps) => {
     };
   }, []);
 
-  // 🟩 Display selected bounding area
+  // Handle selected area display
   useEffect(() => {
     if (!mapRef.current || !selectedArea) return;
+
     const map = mapRef.current;
 
+    // Remove previous selected area
     if (selectedAreaLayerRef.current) {
       map.removeLayer(selectedAreaLayerRef.current);
     }
 
+    // Add new selected area
     const bounds: L.LatLngBoundsExpression = [
       [selectedArea.boundingBox[0][0], selectedArea.boundingBox[0][1]],
-      [selectedArea.boundingBox[1][0], selectedArea.boundingBox[1][1]],
+      [selectedArea.boundingBox[1][0], selectedArea.boundingBox[1][1]]
     ];
 
     selectedAreaLayerRef.current = L.rectangle(bounds, {
@@ -66,79 +69,44 @@ const MapView = ({ clusters, selectedArea }: MapViewProps) => {
       fillOpacity: 0.1,
     }).addTo(map);
 
+    // Fit map to bounds
     map.fitBounds(bounds, { padding: [50, 50] });
   }, [selectedArea]);
 
-  // 🔴 Render walkability clusters safely
+  // Render clusters
   useEffect(() => {
     if (!mapRef.current || !clusters) return;
+
     const map = mapRef.current;
     const clusterLayers: L.CircleMarker[] = [];
 
-    console.log("🌍 Incoming clusters:", clusters);
-
     clusters.forEach((cluster) => {
-      const coords = cluster.geometry?.coordinates;
+      const coords = cluster.geometry.coordinates[0][0];
+      const color = 
+        cluster.severity === "high" ? "hsl(0 65% 51%)" :
+        cluster.severity === "medium" ? "hsl(38 92% 50%)" :
+        "hsl(152 24% 42%)";
 
-      console.log("🧩 MapView received coords:", coords);
-
-      // Validate coordinate format
-      if (
-        !coords ||
-        !Array.isArray(coords) ||
-        coords.length !== 2 ||
-        typeof coords[0] !== "number" ||
-        typeof coords[1] !== "number"
-      ) {
-        console.warn("⚠️ Skipping cluster with invalid coords:", cluster);
-        return;
-      }
-
-      const [lat, lon] = coords;
-
-      // Skip invalid or NaN
-      if (!isFinite(lat) || !isFinite(lon)) {
-        console.warn("⚠️ Invalid lat/lon, skipping cluster:", cluster);
-        return;
-      }
-
-      console.log(`✅ Valid cluster ${cluster.id}: lat=${lat}, lon=${lon}`);
-
-      const color =
-        cluster.severity === "high"
-          ? "hsl(0 65% 51%)"
-          : cluster.severity === "medium"
-          ? "hsl(38 92% 50%)"
-          : "hsl(152 24% 42%)";
-
-      const marker = L.circleMarker([lat, lon], {
-        radius:
-          cluster.severity === "high"
-            ? 14
-            : cluster.severity === "medium"
-            ? 10
-            : 8,
-        color,
+      const marker = L.circleMarker([coords[1], coords[0]], {
+        radius: 12,
+        color: color,
         weight: 3,
         fillOpacity: 0.3,
       }).addTo(map);
 
       marker.bindPopup(`
         <div class="p-2">
-          <strong>${cluster.metrics?.name || "Unknown Cluster"}</strong><br/>
-          <span style="color:${color}">
-            Severity: ${cluster.severity?.toUpperCase() || "N/A"}
-          </span><br/>
-          Walkability Score: ${cluster.metrics?.score ?? "?"}/100
+          <strong class="font-bold">${cluster.metrics.name}</strong><br/>
+          <span style="color: ${color}">Severity: ${cluster.severity.toUpperCase()}</span><br/>
+          Walkability Score: ${cluster.metrics.score}/100
         </div>
       `);
 
       clusterLayers.push(marker);
     });
 
-    // Cleanup
     return () => {
-      clusterLayers.forEach((layer) => map.removeLayer(layer));
+      clusterLayers.forEach(layer => map.removeLayer(layer));
     };
   }, [clusters]);
 
