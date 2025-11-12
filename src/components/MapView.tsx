@@ -81,7 +81,7 @@ const MapView = ({ clusters, selectedArea }: MapViewProps) => {
     const clusterLayers: L.CircleMarker[] = [];
 
     clusters.forEach((cluster) => {
-      const coords = cluster.geometry.coordinates[0][0];
+      const coords = cluster.geometry.coordinates[0]; // Access [lon, lat] array
       const color = 
         cluster.severity === "high" ? "hsl(0 65% 51%)" :
         cluster.severity === "medium" ? "hsl(38 92% 50%)" :
