@@ -2,30 +2,34 @@ export const transformBackendClusters = (clusters: any[]) => {
   if (!Array.isArray(clusters)) return [];
 
   return clusters.map((c, i) => {
-    // ⭐ Extract coordinates safely
-    let coords: [number, number] = [0, 0];
+    // Coordinates from backend
+    const coords: [number, number] = 
+      c.coordinates ||
+      c.geometry?.coordinates ||
+      (c.lat && c.lon ? [c.lat, c.lon] : [0, 0]);
 
-    if (Array.isArray(c.coordinates) && c.coordinates.length === 2) {
-      coords = c.coordinates as [number, number];
-    } else if (Array.isArray(c.geometry?.coordinates)) {
-      coords = c.geometry.coordinates as [number, number];
-    } else if (typeof c.lat === "number" && typeof c.lon === "number") {
-      coords = [c.lat, c.lon];
-    }
+    // Use backend walkability score
+    const score = 
+      c.walkability_score_normalized ??
+      c.walkability_score ??
+      c.metrics?.score ??
+      50;
 
-    // ⭐ Fallback metrics
-    const score = c.metrics?.score ?? c.walkability_score ?? 50;
-    const name = c.metrics?.name ?? c.name ?? "Walkability Issue";
+    // Severity normalized
+    const severity = 
+      c.severity || 
+      c.risk_level || 
+      (score < 33 ? "high" : score < 66 ? "medium" : "low");
 
     return {
       id: c.id || `cluster-${i}`,
-      severity: c.severity || c.risk_level || "medium",
+      severity,
       metrics: {
-        score,
-        name,
+        score: Math.round(score),
+        name: c.metrics?.name ?? "Walkability Issue"
       },
       coordinates: coords,
-      description: c.description || c.note || "No description available",
+      description: c.description || "No description available"
     };
   });
 };
