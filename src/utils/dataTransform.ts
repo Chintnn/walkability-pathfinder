@@ -1,31 +1,14 @@
-import { BackendCluster, FrontendCluster } from "@/types/backend";
+export const transformBackendClusters = (clusters: any[]) => {
+  if (!Array.isArray(clusters)) return [];
 
-/**
- * Transform backend cluster data to frontend format
- */
-export const transformBackendClusters = (
-  backendClusters: BackendCluster[]
-): FrontendCluster[] => {
-  return backendClusters.map((cluster) => ({
-    id: cluster.id.toString(),
-    geometry: {
-      coordinates: [[cluster.coordinates[1], cluster.coordinates[0]]], // Convert to [lon, lat] for GeoJSON
-    },
-    severity: cluster.risk_level.toLowerCase() as "high" | "medium" | "low",
+  return clusters.map((c, i) => ({
+    id: c.id || `cluster-${i}`,
+    severity: c.severity || "medium",
     metrics: {
-      score: getSeverityScore(cluster.risk_level),
-      name: cluster.name,
+      score: c.metrics?.score ?? 50,
+      name: c.metrics?.name ?? "Unknown Area",
     },
+    coordinates: c.coordinates || [0, 0],
+    description: c.description || "No description available"
   }));
-};
-
-/**
- * Convert risk level to numeric score
- */
-const getSeverityScore = (riskLevel: string): number => {
-  const normalized = riskLevel.toLowerCase();
-  if (normalized === "high") return 25;
-  if (normalized === "medium") return 50;
-  if (normalized === "low") return 75;
-  return 50; // default
 };
