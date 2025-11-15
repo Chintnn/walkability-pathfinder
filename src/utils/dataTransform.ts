@@ -2,34 +2,37 @@ export const transformBackendClusters = (clusters: any[]) => {
   if (!Array.isArray(clusters)) return [];
 
   return clusters.map((c, i) => {
-    // Coordinates from backend
-    const coords: [number, number] = 
-      c.coordinates ||
-      c.geometry?.coordinates ||
-      (c.lat && c.lon ? [c.lat, c.lon] : [0, 0]);
+    // Extract coordinates from Shapely Point (backend)
+    let coords: [number, number] = [0, 0];
+    try {
+      if (c.geometry && c.geometry.coordinates) {
+        // Backend sends [lon, lat]
+        coords = [c.geometry.coordinates[1], c.geometry.coordinates[0]];
+      }
+    } catch {}
 
-    // Use backend walkability score
-    const score = 
+    // Extract score properly
+    const score =
       c.walkability_score_normalized ??
       c.walkability_score ??
-      c.metrics?.score ??
+      c.score ?? // <-- backend recommendation score
       50;
 
-    // Severity normalized
-    const severity = 
-      c.severity || 
-      c.risk_level || 
-      (score < 33 ? "high" : score < 66 ? "medium" : "low");
+    // Convert to severity
+    const severity =
+      score < 33 ? "high"
+      : score < 66 ? "medium"
+      : "low";
 
     return {
-      id: c.id || `cluster-${i}`,
+      id: c.id ?? `cluster-${i}`,
       severity,
       metrics: {
         score: Math.round(score),
-        name: c.metrics?.name ?? "Walkability Issue"
+        name: c.description ?? "Walkability Issue",
       },
       coordinates: coords,
-      description: c.description || "No description available"
+      description: c.description ?? "No description available",
     };
   });
 };
