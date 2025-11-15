@@ -2,34 +2,45 @@ export const transformBackendClusters = (clusters: any[]) => {
   if (!Array.isArray(clusters)) return [];
 
   return clusters.map((c, i) => {
-    // Extract coordinates from Shapely Point (backend)
-    let coords: [number, number] = [0, 0];
-    try {
-      if (c.geometry && c.geometry.coordinates) {
-        // Backend sends [lon, lat]
-        coords = [c.geometry.coordinates[1], c.geometry.coordinates[0]];
-      }
-    } catch {}
+    // -------------------------------
+    // 1️⃣ Extract coordinates
+    // -------------------------------
+    const lat = Number(c.lat ?? 0);
+    const lon = Number(c.lon ?? 0);
 
-    // Extract score properly
+    const coords: [number, number] = [lat, lon];
+
+    // -------------------------------
+    // 2️⃣ Extract walkability score
+    // -------------------------------
     const score =
       c.walkability_score_normalized ??
       c.walkability_score ??
-      c.score ?? // <-- backend recommendation score
+      c.metrics?.score ??
       50;
 
-    // Convert to severity
-    const severity =
-      score < 33 ? "high"
-      : score < 66 ? "medium"
-      : "low";
+    const roundedScore = Math.round(Number(score) || 50);
 
+    // -------------------------------
+    // 3️⃣ Severity (matches backend)
+    // -------------------------------
+    const severity =
+      c.severity ??
+      (roundedScore < 33
+        ? "high"
+        : roundedScore < 66
+        ? "medium"
+        : "low");
+
+    // -------------------------------
+    // 4️⃣ Build final cluster object
+    // -------------------------------
     return {
       id: c.id ?? `cluster-${i}`,
       severity,
       metrics: {
-        score: Math.round(score),
-        name: c.description ?? "Walkability Issue",
+        score: roundedScore,
+        name: c.name ?? "Walkability Issue",
       },
       coordinates: coords,
       description: c.description ?? "No description available",
