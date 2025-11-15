@@ -4,7 +4,6 @@ import { Badge } from "./ui/badge";
 import { Progress } from "./ui/progress";
 import { 
   AlertCircle, 
-  TrendingUp, 
   MapPin, 
   Zap,
   ArrowRight,
@@ -14,12 +13,13 @@ import {
 interface AnalysisPanelProps {
   data: {
     clusters: Array<{
-      id: string;
-      severity: "high" | "medium" | "low";
-      metrics: {
-        score: number;
-        name: string;
+      id?: string;
+      severity?: "high" | "medium" | "low" | string;
+      metrics?: {
+        score?: number;
+        name?: string;
       };
+      description?: string;
     }>;
     avgWalkabilityScore?: number;
   } | null;
@@ -34,7 +34,8 @@ const AnalysisPanel = ({
   onGenerateReport,
   isLoading = false 
 }: AnalysisPanelProps) => {
-  if (!data) {
+
+  if (!data || !data.clusters) {
     return (
       <Card className="h-full p-6 brutalist-border bg-card flex flex-col items-center justify-center gap-4">
         <AlertCircle className="h-12 w-12 text-muted-foreground" />
@@ -45,17 +46,29 @@ const AnalysisPanel = ({
     );
   }
 
-  const highSeverityClusters = data.clusters.filter(c => c.severity === "high").length;
-  const avgWalkability = data.avgWalkabilityScore || 50;
+  // Safety defaults
+  const clusters = data.clusters.map((c, i) => ({
+    id: c.id ?? `cluster-${i}`,
+    severity: c.severity ?? "medium",
+    metrics: {
+      score: c.metrics?.score ?? 50,
+      name: c.metrics?.name ?? "Unnamed Zone"
+    },
+    description: c.description ?? "No description available"
+  }));
+
+  const highSeverityClusters = clusters.filter(c => c.severity === "high").length;
+  const avgWalkability = data.avgWalkabilityScore ?? 50;
 
   return (
     <div className="h-full overflow-y-auto space-y-4 p-4">
-      {/* Overview Stats */}
+
+      {/* Overview */}
       <Card className="p-6 brutalist-border brutalist-shadow bg-card">
         <h2 className="text-2xl font-bold mb-4 border-b-2 border-border pb-2">
           Analysis Overview
         </h2>
-        
+
         <div className="grid grid-cols-2 gap-4">
           <div className="space-y-2">
             <p className="text-sm text-muted-foreground font-bold">WALKABILITY SCORE</p>
@@ -65,7 +78,7 @@ const AnalysisPanel = ({
             </div>
             <Progress value={avgWalkability} className="h-2" />
           </div>
-          
+
           <div className="space-y-2">
             <p className="text-sm text-muted-foreground font-bold">CRITICAL AREAS</p>
             <div className="flex items-center gap-2">
@@ -76,32 +89,40 @@ const AnalysisPanel = ({
         </div>
       </Card>
 
-      {/* Bottleneck Clusters */}
+      {/* Cluster list */}
       <Card className="p-6 brutalist-border brutalist-shadow bg-card">
         <h3 className="text-xl font-bold mb-4 flex items-center gap-2">
           <MapPin className="h-5 w-5" />
           Identified Bottlenecks
         </h3>
-        
+
         <div className="space-y-3">
-          {data.clusters.slice(0, 5).map((cluster) => (
-            <div 
-              key={cluster.id}
-              className="p-4 border-2 border-border bg-muted space-y-2"
-            >
+          {clusters.slice(0, 5).map((cluster) => (
+            <div key={cluster.id} className="p-4 border-2 border-border bg-muted space-y-2">
+
               <div className="flex items-center justify-between">
                 <span className="font-bold text-sm">{cluster.metrics.name}</span>
+
                 <Badge 
-                  variant={cluster.severity === "high" ? "destructive" : cluster.severity === "medium" ? "default" : "secondary"}
+                  variant={
+                    cluster.severity === "high" ? "destructive"
+                    : cluster.severity === "medium" ? "default"
+                    : "secondary"
+                  }
                   className="font-bold"
                 >
                   {cluster.severity.toUpperCase()}
                 </Badge>
               </div>
+
               <div className="flex items-center gap-2 text-sm">
                 <span className="text-muted-foreground">Walkability Score:</span>
                 <span className="font-bold">{cluster.metrics.score}/100</span>
               </div>
+
+              <p className="text-xs text-muted-foreground">
+                {cluster.description}
+              </p>
             </div>
           ))}
         </div>
@@ -113,10 +134,10 @@ const AnalysisPanel = ({
           <Zap className="h-5 w-5" />
           Analysis Actions
         </h3>
-        
+
         <div className="space-y-3">
           <Button 
-            onClick={() => onSimulate(data.clusters.map(c => c.id))}
+            onClick={() => onSimulate(clusters.map(c => c.id))}
             className="w-full brutalist-shadow font-bold"
             disabled={isLoading}
           >
