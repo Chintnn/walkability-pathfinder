@@ -23,7 +23,7 @@ const Index = () => {
     toast.info("Searching location...", { description: query });
 
     try {
-      // Step 1: Get location coordinates using OpenStreetMap API
+      // Step 1: Convert place name → coordinates
       const response = await fetch(
         `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(
           query
@@ -43,49 +43,44 @@ const Index = () => {
       const lat = parseFloat(location.lat);
       const lon = parseFloat(location.lon);
 
-      // Step 2: Call FastAPI backend for analysis
       toast.info("Analyzing walkability...", {
-        description: "Processing OSM data with AI model",
+        description: "Processing OSM data",
       });
 
-      try {
-        const backendResponse = await fetch(getApiUrl("ANALYZE"), {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ lat, lon }),
-        });
+      // Step 2: POST request to backend
+      const backendResponse = await fetch(getApiUrl("ANALYZE_POST"), {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ lat, lon }),
+      });
 
-        if (!backendResponse.ok) {
-          throw new Error(`Backend error: ${backendResponse.status}`);
-        }
-
-        const backendData: BackendAnalysisResponse = await backendResponse.json();
-        console.log("Backend Response:", backendData);
-
-        // Transform backend data to frontend format
-        const transformedClusters = transformBackendClusters(backendData.clusters);
-        
-        setAnalysisData({
-          clusters: transformedClusters,
-          avgWalkabilityScore: calculateAverageScore(transformedClusters),
-        });
-
-        toast.success("Analysis complete!", {
-          description: `Found ${transformedClusters.length} walkability clusters`,
-        });
-      } catch (error) {
-        console.error("Backend error:", error);
-        toast.error("Analysis failed", {
-          description: "Please check your API configuration in src/config/api.ts",
-        });
-        setIsAnalyzing(false);
-        return;
+      if (!backendResponse.ok) {
+        throw new Error(`Backend returned status ${backendResponse.status}`);
       }
 
-      // Step 3: Create bounding box (for visualization)
-      const offset = 0.005; // roughly 0.5km
+      const backendData: BackendAnalysisResponse =
+        await backendResponse.json();
+
+      console.log("Backend Response:", backendData);
+
+      // Convert backend structure → frontend structure
+      const transformedClusters = transformBackendClusters(
+        backendData.clusters
+      );
+
+      setAnalysisData({
+        clusters: transformedClusters,
+        avgWalkabilityScore: calculateAverageScore(transformedClusters),
+      });
+
+      toast.success("Analysis complete!", {
+        description: `Found ${transformedClusters.length} clusters`,
+      });
+
+      // Step 3: Save selected map area
+      const offset = 0.005;
       const boundingBox = [
         [lat - offset, lon - offset],
         [lat + offset, lon + offset],
@@ -96,7 +91,7 @@ const Index = () => {
     } catch (error) {
       console.error("Search error:", error);
       toast.error("Search failed", {
-        description: "Please try again.",
+        description: "Try again or check your backend URL.",
       });
       setIsAnalyzing(false);
     }
@@ -109,25 +104,15 @@ const Index = () => {
 
     setTimeout(() => {
       toast.success("Simulation complete!", {
-        description: "Impact estimates updated",
+        description: "Impact updated",
       });
     }, 1500);
   };
 
   const handleGenerateReport = () => {
     toast.success("Generating policy report...", {
-      description: "Your PDF will download shortly",
+      description: "Downloading PDF...",
     });
-
-    setTimeout(() => {
-      toast.success("Report ready!", {
-        description: "Download starting now",
-        action: {
-          label: "Download",
-          onClick: () => console.log("Download report"),
-        },
-      });
-    }, 1500);
   };
 
   return (
@@ -135,7 +120,7 @@ const Index = () => {
       <Header onSearch={handleSearch} isSearching={isAnalyzing} />
 
       <div className="flex-1 flex overflow-hidden">
-        {/* Map Section */}
+        {/* Map */}
         <div className="flex-1 p-4">
           <MapView
             clusters={analysisData?.clusters}
@@ -143,7 +128,7 @@ const Index = () => {
           />
         </div>
 
-        {/* Analysis Panel */}
+        {/* Panel */}
         <div className="w-[400px] border-l-4 border-border">
           <AnalysisPanel
             data={analysisData}
